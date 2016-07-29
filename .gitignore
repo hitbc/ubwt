@@ -1,0 +1,31 @@
+# Object files
+src/*.o
+*.o
+
+# Executables
+ubwt
+gdb_ubwt
+debug_ubwt
+
+# Project files
+.cproject
+.project
+
+#ctags
+src/tags
+tags
+
+#cscope
+src/cscope.*
+cscope.*
+
+#data
+data/*
+test/*
+
+#output
+out/*
+
+#sh
+*.sh
+*.awk
