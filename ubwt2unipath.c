@@ -39,7 +39,7 @@ int ubwt2unipath(int argc, char *argv[])
     // gen unipath
     ubwt_gen_unipath(ubwt, ubwt_bstr, uni_c, out);
 
-    if (out) fclose(out);
+    if (out) fclose(out); free(fn);
     free(ubwt->ubwt); free(ubwt); free(ubwt_bstr);
     return 0;
 }

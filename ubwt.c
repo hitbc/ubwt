@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "ubwt.h"
 #include "utils.h"
 
@@ -219,6 +220,7 @@ void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
     for (i = uni_i-1; i >= 0; --i)
         fprintf(out, "%c", unipath[i]);
     fprintf(out, "\n");
+    free(unipath);
 }
 
 void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out)
@@ -246,6 +248,22 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out)
         fprintf(out, "\n");
     }
     free(unipath);
+}
+
+uint8_t *ubwt_read_seq(FILE *fp, uint64_t *seq_l)
+{
+    uint8_t *bseq = (uint8_t*)_err_malloc(100 * sizeof(uint8_t));
+    char ch; int i = 0, m = 100;
+    while ((ch = fgetc(fp)) != EOF) {
+        if (isspace(ch) || ch == '\n') continue;
+        if (i == m) {
+            m <<= 1;
+            bseq = (uint8_t*)_err_realloc(bseq, m * sizeof(uint8_t));
+        }
+        bseq[i++] = nst_nt4_table[(int)ch];
+    }
+    *seq_l = i;
+    return bseq;
 }
 
 uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
@@ -276,7 +294,7 @@ uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
             ubwt_bstr[bwt_i++] = bwt_int & 0x70;
             ubwt_bstr[bwt_i++] = bwt_int & 0x7;
         }
-        // last bwt_int
+        // last one bwt_int
         if (*ubwt_l != (*ubwt_l/16)*16) {
             err_fread_noeof(&bwt_int, sizeof(uint64_t), 1, fp);
             j = *ubwt_l % 16;
@@ -287,18 +305,9 @@ uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
         }
         err_fclose(fp);
     } else {       // plain text
-        FILE *fp = fopen(fn, "r");
-        // obtain file size:
-        fseek (fp, 0 , SEEK_END);
-        *ubwt_l = ftell(fp)-1;
-        rewind (fp);
-        // alloc mem
-        ubwt_bstr = (uint8_t*)_err_malloc(*ubwt_l * sizeof(uint8_t));
-        char *ubwt_str = (char*)_err_calloc(*ubwt_l, sizeof(char));
-        err_fread_noeof(ubwt_str, sizeof(char), *ubwt_l, fp);
-        printf("%s\n", ubwt_str);
-        for (i = 0; i < *ubwt_l; ++i) ubwt_bstr[i] = nst_nt4_table[(int)ubwt_str[i]];
-        free(ubwt_str);
+        FILE *fp = xopen(fn, "r");
+        // read bwt-str
+        ubwt_bstr = ubwt_read_seq(fp, ubwt_l);
         err_fclose(fp);
     }
     return ubwt_bstr;

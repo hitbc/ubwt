@@ -13,7 +13,6 @@ int ubwt_query_usage(void)
     return 1;
 }
 
-
 void ubwt_query_core(ubwt_t *ubwt, const uint8_t *query, int qlen)
 {
     // ubwt exact match
@@ -47,6 +46,7 @@ int ubwt_query(int argc, char *argv[])
     uint8_t *bquery = ubwt_read_bwt_str(in, 0, &qlen);
     ubwt_query_core(ubwt, bquery, qlen);
 
+    free(prefix); free(in);
     ubwt_free(ubwt); free(bquery);
     return 0;
 }
