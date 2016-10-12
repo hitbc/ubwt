@@ -269,30 +269,18 @@ uint8_t *ubwt_read_seq(FILE *fp, uint64_t *seq_l)
 uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
 {
     uint64_t bwt_int;
-    uint8_t *ubwt_bstr; ubwt_count_t i, j, bwt_i;
+    uint8_t *ubwt_bstr; ubwt_count_t bwt_i; int i, j;
     if (input_b) { // binary file, 4-bit per bp, first 64-bit: length
         FILE *fp = xopen(fn, "rb");
         err_fread_noeof(ubwt_l, sizeof(ubwt_count_t), 1, fp);
+        fprintf(stderr, "ubwt_l: %lld\n", (long long)ubwt_l);
         ubwt_bstr = (uint8_t*)_err_malloc(*ubwt_l * sizeof(uint8_t));
         bwt_i = 0;
         for (i = 0; i < *ubwt_l / 16; ++i) {
             err_fread_noeof(&bwt_int, sizeof(uint64_t), 1, fp);
-            ubwt_bstr[bwt_i++] = bwt_int & 0x7000000000000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x700000000000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x70000000000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x7000000000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x700000000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x70000000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x7000000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x700000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x70000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x7000000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x700000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x70000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x7000;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x700;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x70;
-            ubwt_bstr[bwt_i++] = bwt_int & 0x7;
+            for (j = 15; j >= 0; --j) {
+                ubwt_bstr[bwt_i++] = (bwt_int >> (4*j)) & 0x7;
+            }
         }
         // last one bwt_int
         if (*ubwt_l != (*ubwt_l/16)*16) {
