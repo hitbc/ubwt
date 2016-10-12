@@ -273,7 +273,7 @@ uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
     if (input_b) { // binary file, 4-bit per bp, first 64-bit: length
         FILE *fp = xopen(fn, "rb");
         err_fread_noeof(ubwt_l, sizeof(ubwt_count_t), 1, fp);
-        fprintf(stderr, "ubwt_l: %lld\n", (long long)ubwt_l);
+        //fprintf(stderr, "ubwt_l: %lld\n", (long long)*ubwt_l);
         ubwt_bstr = (uint8_t*)_err_malloc(*ubwt_l * sizeof(uint8_t));
         bwt_i = 0;
         for (i = 0; i < *ubwt_l / 16; ++i) {
