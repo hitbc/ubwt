@@ -47,6 +47,11 @@ typedef struct {
 } ubwt_t; // unipath bwt
 
 typedef struct {
+    int uid, uni_i;
+    char *unipath;
+} ubwt_gen_uni_out_t;
+
+typedef struct {
     int tid;
     ubwt_t *ubwt;
     FILE *out;
