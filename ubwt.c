@@ -217,6 +217,7 @@ void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
         k = ubwt->C[nt] + occ_k;
         if (ubwt_bwt_nt(ubwt, k) >= nt_N) break; 
     }
+    // store in struct, output for every N unipaths XXX
     fprintf(out, ">%lld_%d\n", (long long)uid+1, uni_i);
     for (i = uni_i-1; i >= 0; --i)
         fprintf(out, "%c", unipath[i]);
