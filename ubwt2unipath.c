@@ -8,6 +8,7 @@ int ubwt2unipath_usage(void)
 {
     err_printf("Usage:    ubwt unipath [option] <BWT-STR>\n\n");
     err_printf("Options:\n\n");
+    err_printf("    -t    [INT] Number of threads. [1]\n");
     err_printf("    -f    [STR] Format of input bwt-str. [B]\n"); 
     err_printf("                  \"B\": binary file, 4-bit per bp, 0/1/2/3/4:A/C/G/T/#(first 64-bit: length).\n");
     err_printf("                  \"P\": plain text.\n");
