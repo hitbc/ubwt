@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <pthread.h>
 #include "ubwt.h"
 #include "utils.h"
 
@@ -223,31 +224,69 @@ void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
     free(unipath);
 }
 
-void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out)
-{
-    char *unipath = (char*)_err_calloc(1000, sizeof(char)); int uni_len = 1000;
-    int uni_i, i, j;
-    ubwt_count_t k, occ_k;
+int THREAD_I;
+pthread_rwlock_t RWLOCK;
 
-    for (i = 0; i < uni_c; ++i) {
-        uni_i = 0;
-        k = ubwt->C[nt_N]+i;
-        while (1) {
-            if (uni_i == uni_len) {
-                uni_len <<= 1;
-                unipath = (char*)_err_realloc(unipath, uni_len * sizeof(char));
-            }
-            unipath[uni_i++] = "ACGTN"[ubwt_bstr[k]];
-            occ_k = ubwt_occ(ubwt, k, ubwt_bstr[k]);
-            k = ubwt->C[ubwt_bstr[k]] + occ_k;
-            if (ubwt_bstr[k] >= nt_N) break; 
-        }
-        fprintf(out, ">%lld_%d\n", (long long)i+1, uni_i);
-        for (j = uni_i-1; j >= 0; --j)
-            fprintf(out, "%c", unipath[j]);
-        fprintf(out, "\n");
+static void *ubwt_thread_gen_unipath(void *aux)
+{
+    ubwt_gen_uni_aux_t *a = (ubwt_gen_uni_aux_t*)aux;
+
+    int i;
+    while (1) {
+        pthread_rwlock_wrlock(&RWLOCK);
+        i = THREAD_I++;
+        pthread_rwlock_unlock(&RWLOCK);
+        if (i >= a->uni_c) break;
+
+        ubwt_gen_unipath1(a->ubwt, i, a->out); // XXX
     }
-    free(unipath);
+    return 0;
+}
+
+void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out, int t)
+{
+    int i, j;
+    if (t > 1) {
+        ubwt_gen_uni_aux_t *aux = (ubwt_gen_uni_aux_t*)_err_malloc(t * sizeof(ubwt_gen_uni_aux_t));
+        for (i = 0; i < t; ++i) {
+            aux[i].tid = i;
+            aux[i].ubwt = ubwt;
+            aux[i].out = out;
+            aux[i].uni_c = uni_c;
+        }
+        THREAD_I = 0;
+        pthread_t *tid = (pthread_t*)_err_malloc(t * sizeof(pthread_t)); pthread_attr_t attr;
+        pthread_attr_init(&attr); pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+        for (i = 0; i < t; ++i) {
+            pthread_create(&tid[i], &attr, ubwt_thread_gen_unipath, aux+i);
+        }
+        for (i = 0; i < t; ++i) pthread_join(tid[i], 0);
+        free(tid);
+    } else {
+        char *unipath = (char*)_err_calloc(1000, sizeof(char)); int uni_len = 1000;
+        int uni_i;
+        ubwt_count_t k, occ_k;
+
+        for (i = 0; i < uni_c; ++i) {
+            uni_i = 0;
+            k = ubwt->C[nt_N]+i;
+            while (1) {
+                if (uni_i == uni_len) {
+                    uni_len <<= 1;
+                    unipath = (char*)_err_realloc(unipath, uni_len * sizeof(char));
+                }
+                unipath[uni_i++] = "ACGTN"[ubwt_bstr[k]];
+                occ_k = ubwt_occ(ubwt, k, ubwt_bstr[k]);
+                k = ubwt->C[ubwt_bstr[k]] + occ_k;
+                if (ubwt_bstr[k] >= nt_N) break; 
+            }
+            fprintf(out, ">%lld_%d\n", (long long)i+1, uni_i);
+            for (j = uni_i-1; j >= 0; --j)
+                fprintf(out, "%c", unipath[j]);
+            fprintf(out, "\n");
+        }
+        free(unipath);
+    }
 }
 
 uint8_t *ubwt_read_seq(FILE *fp, uint64_t *seq_l)
