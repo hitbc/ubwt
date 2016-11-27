@@ -21,7 +21,7 @@ cscope.*
 
 #data
 data/*
-test_data/*.ubwt
+test_data/*
 test/*
 
 #output
