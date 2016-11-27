@@ -22,7 +22,7 @@ int ubwt2unipath(int argc, char *argv[])
 {
     int c; int input_b = 1; FILE *out = stdout;
     int t=1, chunk_size = CHUNK_SIZE;
-    while ((c = getopt(argc, argv, "t:f:o:")) >= 0) {
+    while ((c = getopt(argc, argv, "t:f:o:c:")) >= 0) {
         switch (c) {
             case 't': t = atoi(optarg); break;
             case 'f': if (optarg[0] == 'P') input_b = 0; break;
