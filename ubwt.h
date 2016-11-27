@@ -51,7 +51,7 @@ typedef struct {
     char *unipath;
 } ubwt_gen_uni_out_t;
 
-#define CHUNK_SIZE 1024
+#define CHUNK_SIZE 32678
 typedef struct {
     int tid;
     ubwt_t *ubwt;
