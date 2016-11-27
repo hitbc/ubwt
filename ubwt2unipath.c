@@ -13,6 +13,7 @@ int ubwt2unipath_usage(void)
     err_printf("                  \"B\": binary file, 4-bit per bp, 0/1/2/3/4:A/C/G/T/#(first 64-bit: length).\n");
     err_printf("                  \"P\": plain text.\n");
     err_printf("    -o    [STR] Output file(FASTA format). [stdout]\n");
+    err_printf("    -c    [INT] Chunk size of each run when t>1. [%d]\n", CHUNK_SIZE);
     err_printf("\n");
     return 1; 
 }

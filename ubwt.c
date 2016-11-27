@@ -243,11 +243,11 @@ void ubwt_thread_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, int uni_s, char **
         k = ubwt->C[nt] + occ_k;
         if (ubwt_bwt_nt(ubwt, k) >= nt_N) break; 
     }
-    out_unipath[uid-uni_s] = (char*)_err_malloc(uni_i);
+    out_unipath[uid-uni_s] = (char*)_err_malloc(uni_i+1);
     int j = 0;
-    for (i = uni_i-1; i >= 0; --i) {
+    for (i = uni_i-1; i >= 0; --i)
         out_unipath[uid-uni_s][j++] = unipath[i];
-    }
+    out_unipath[uid-uni_s][j] = '\0';
     free(unipath);
 }
 
@@ -277,17 +277,19 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out, in
         int chunk_n = chunk_size;
         char **unipath = (char**)_err_malloc(chunk_n * sizeof(char*));
         int uni_s = 0, remain_uni=uni_c;
-        
+        ubwt_gen_uni_aux_t *aux = (ubwt_gen_uni_aux_t*)_err_malloc(t * sizeof(ubwt_gen_uni_aux_t));
+        for (i = 0; i < t; ++i) {
+            aux[i].tid = i;
+            aux[i].ubwt = ubwt;
+            aux[i].unipath = unipath;
+        }
         while (remain_uni > 0) {
             if (remain_uni < chunk_n) chunk_n = remain_uni;
 
-            ubwt_gen_uni_aux_t *aux = (ubwt_gen_uni_aux_t*)_err_malloc(t * sizeof(ubwt_gen_uni_aux_t));
             for (i = 0; i < t; ++i) {
-                aux[i].tid = i;
-                aux[i].ubwt = ubwt;
                 aux[i].uni_s = uni_s; aux[i].uni_c = uni_s + chunk_n;
-                aux[i].unipath = unipath;
             }
+            
             THREAD_I = uni_s;
             pthread_t *tid = (pthread_t*)_err_malloc(t * sizeof(pthread_t)); pthread_attr_t attr;
             pthread_attr_init(&attr); pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -304,6 +306,7 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out, in
             uni_s += chunk_n;              
             remain_uni -= chunk_n;
         }
+        free(aux); free(unipath);
     } else {
         char *unipath = (char*)_err_calloc(1000, sizeof(char)); int uni_len = 1000;
         int uni_i;
