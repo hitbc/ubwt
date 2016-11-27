@@ -20,12 +20,13 @@ int ubwt2unipath_usage(void)
 int ubwt2unipath(int argc, char *argv[])
 {
     int c; int input_b = 1; FILE *out = stdout;
-    int t=1;
+    int t=1, chunk_size = CHUNK_SIZE;
     while ((c = getopt(argc, argv, "t:f:o:")) >= 0) {
         switch (c) {
             case 't': t = atoi(optarg); break;
             case 'f': if (optarg[0] == 'P') input_b = 0; break;
             case 'o': out = fopen(optarg, "w"); break;
+            case 'c': chunk_size = atoi(optarg); break;
             default: return ubwt2unipath_usage();
         }
     }
@@ -40,7 +41,7 @@ int ubwt2unipath(int argc, char *argv[])
     uni_c = ubwt_cal(ubwt, ubwt_bstr, ubwt_l);
     ubwt_update(ubwt);
     // gen unipath
-    ubwt_gen_unipath(ubwt, ubwt_bstr, uni_c, out, t);
+    ubwt_gen_unipath(ubwt, ubwt_bstr, uni_c, out, t, chunk_size);
 
     if (out) fclose(out); free(fn);
     free(ubwt->ubwt); free(ubwt); free(ubwt_bstr);

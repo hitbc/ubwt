@@ -51,11 +51,12 @@ typedef struct {
     char *unipath;
 } ubwt_gen_uni_out_t;
 
+#define CHUNK_SIZE 1024
 typedef struct {
     int tid;
     ubwt_t *ubwt;
-    FILE *out;
-    int uni_c;
+    char **unipath;
+    int uni_s, uni_c;
 } ubwt_gen_uni_aux_t;
 
 uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l);
@@ -68,7 +69,7 @@ void ubwt_gen_bit_table16(ubwt_t *ubwt);
 void ubwt_update(ubwt_t *ubwt);
 void ubwt_gen_map(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c);
 ubwt_count_t ubwt_cal_off(ubwt_t *ubwt, ubwt_count_t k, ubwt_count_t *off);
-void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out, int t);
+void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out, int t, int chunk_size);
 void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out);
 
 #endif

@@ -225,6 +225,32 @@ void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
     free(unipath);
 }
 
+void ubwt_thread_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, int uni_s, char **out_unipath)
+{
+    char *unipath = (char*)_err_calloc(1000, sizeof(char)); int uni_len = 1000;
+    int uni_i = 0, i; uint8_t nt;
+    ubwt_count_t k, occ_k;
+    
+    k = ubwt->C[nt_N] + uid;
+    while (1) {
+        if (uni_i == uni_len) {
+            uni_len <<= 1;
+            unipath = (char*)_err_realloc(unipath, uni_len * sizeof(char));
+        }
+        nt = ubwt_bwt_nt(ubwt, k);
+        unipath[uni_i++] = "ACGTN"[nt];
+        occ_k = ubwt_occ(ubwt, k, nt);
+        k = ubwt->C[nt] + occ_k;
+        if (ubwt_bwt_nt(ubwt, k) >= nt_N) break; 
+    }
+    out_unipath[uid-uni_s] = (char*)_err_malloc(uni_i);
+    int j = 0;
+    for (i = uni_i-1; i >= 0; --i) {
+        out_unipath[uid-uni_s][j++] = unipath[i];
+    }
+    free(unipath);
+}
+
 int THREAD_I;
 pthread_rwlock_t RWLOCK;
 
@@ -239,30 +265,45 @@ static void *ubwt_thread_gen_unipath(void *aux)
         pthread_rwlock_unlock(&RWLOCK);
         if (i >= a->uni_c) break;
 
-        ubwt_gen_unipath1(a->ubwt, i, a->out); // XXX
+        ubwt_thread_gen_unipath1(a->ubwt, i, a->uni_s, a->unipath); // XXX
     }
     return 0;
 }
 
-void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out, int t)
+void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c, FILE *out, int t, int chunk_size)
 {
     int i, j;
     if (t > 1) {
-        ubwt_gen_uni_aux_t *aux = (ubwt_gen_uni_aux_t*)_err_malloc(t * sizeof(ubwt_gen_uni_aux_t));
-        for (i = 0; i < t; ++i) {
-            aux[i].tid = i;
-            aux[i].ubwt = ubwt;
-            aux[i].out = out;
-            aux[i].uni_c = uni_c;
+        int chunk_n = chunk_size;
+        char **unipath = (char**)_err_malloc(chunk_n * sizeof(char*));
+        int uni_s = 0, remain_uni=uni_c;
+        
+        while (remain_uni > 0) {
+            if (remain_uni < chunk_n) chunk_n = remain_uni;
+
+            ubwt_gen_uni_aux_t *aux = (ubwt_gen_uni_aux_t*)_err_malloc(t * sizeof(ubwt_gen_uni_aux_t));
+            for (i = 0; i < t; ++i) {
+                aux[i].tid = i;
+                aux[i].ubwt = ubwt;
+                aux[i].uni_s = uni_s; aux[i].uni_c = uni_s + chunk_n;
+                aux[i].unipath = unipath;
+            }
+            THREAD_I = uni_s;
+            pthread_t *tid = (pthread_t*)_err_malloc(t * sizeof(pthread_t)); pthread_attr_t attr;
+            pthread_attr_init(&attr); pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+            for (i = 0; i < t; ++i) {
+                pthread_create(&tid[i], &attr, ubwt_thread_gen_unipath, aux+i);
+            }
+            for (i = 0; i < t; ++i) pthread_join(tid[i], 0);
+            free(tid);
+
+            // output chunk_n unipaths
+            for (i = 0; i < chunk_n; ++i)
+                fprintf(out, ">%lld_%d\n%s\n", (long long)uni_s+i+1, (int)strlen(unipath[i]), unipath[i]);
+            for(i = 0; i < chunk_n; ++i) free(unipath[i]);
+            uni_s += chunk_n;              
+            remain_uni -= chunk_n;
         }
-        THREAD_I = 0;
-        pthread_t *tid = (pthread_t*)_err_malloc(t * sizeof(pthread_t)); pthread_attr_t attr;
-        pthread_attr_init(&attr); pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-        for (i = 0; i < t; ++i) {
-            pthread_create(&tid[i], &attr, ubwt_thread_gen_unipath, aux+i);
-        }
-        for (i = 0; i < t; ++i) pthread_join(tid[i], 0);
-        free(tid);
     } else {
         char *unipath = (char*)_err_calloc(1000, sizeof(char)); int uni_len = 1000;
         int uni_i;
