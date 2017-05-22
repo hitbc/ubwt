@@ -32,14 +32,14 @@ int ubwt2unipath(int argc, char *argv[])
         }
     }
     if (argc - 1 != optind) return ubwt2unipath_usage();
-    char *fn = strdup(argv[optind]); ubwt_count_t ubwt_l; int uni_c;
+    char *fn = strdup(argv[optind]); ubwt_count_t ubwt_l;
 
     // read ubwt str
     uint8_t *ubwt_bstr = ubwt_read_bwt_str(fn, input_b, &ubwt_l);
     // init ubwt
     ubwt_t *ubwt = (ubwt_t*)_err_malloc(sizeof(ubwt_t));
     ubwt_init(ubwt, ubwt_l);
-    uni_c = ubwt_cal(ubwt, ubwt_bstr, ubwt_l);
+    ubwt_count_t uni_c = ubwt_cal(ubwt, ubwt_bstr, ubwt_l);
     ubwt_update(ubwt);
     // gen unipath
     ubwt_gen_unipath(ubwt, ubwt_bstr, uni_c, out, t, chunk_size);
