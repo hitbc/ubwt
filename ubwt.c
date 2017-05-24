@@ -165,11 +165,10 @@ ubwt_count_t ubwt_exact_match(const ubwt_t *ubwt, int qlen, const uint8_t *query
     return l-k+1;
 }
 
-void ubwt_gen_map(ubwt_t *ubwt, uint8_t *ubwt_bstr, int uni_c)
+void ubwt_gen_map(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c)
 {
     ubwt->ubwt_map = (ubwt_count_t*)_err_malloc(uni_c * sizeof(ubwt_count_t));
-    int i;
-    ubwt_count_t k, occ_k;
+    ubwt_count_t i, k, occ_k;
     for (i = 0; i < uni_c; ++i) {
         k = ubwt->C[nt_N]+i;
         while (1) {
@@ -201,9 +200,9 @@ ubwt_count_t ubwt_cal_off(ubwt_t *ubwt, ubwt_count_t k, ubwt_count_t *off)
 
 void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
 {
-    char *unipath = (char*)_err_calloc(1000, sizeof(char)); int uni_len = 1000;
-    int uni_i = 0, i; uint8_t nt;
-    ubwt_count_t k, occ_k;
+    char *unipath = (char*)_err_calloc(1000, sizeof(char));
+    uint8_t nt;
+    ubwt_count_t i, k, occ_k, uni_i = 0, uni_len = 1000;
     
     k = ubwt->C[nt_N] + uid;
     while (1) {
@@ -218,17 +217,17 @@ void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
         if (ubwt_bwt_nt(ubwt, k) >= nt_N) break; 
     }
     // store in struct, output for every N unipaths XXX
-    fprintf(out, ">%lld_%d\n", (long long)uid+1, uni_i);
-    for (i = uni_i-1; i >= 0; --i)
+    fprintf(out, ">%lld_%lld\n", (long long)uid+1, (long long)uni_i);
+    for (i = uni_i-1; i != 0; --i)
         fprintf(out, "%c", unipath[i]);
     fprintf(out, "\n");
     free(unipath);
 }
 
-void ubwt_thread_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, int uni_s, char **out_unipath)
+void ubwt_thread_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, ubwt_count_t uni_s, char **out_unipath)
 {
-    char *unipath = (char*)_err_calloc(1000, sizeof(char)); int uni_len = 1000;
-    int uni_i = 0, i; uint8_t nt;
+    char *unipath = (char*)_err_calloc(1000, sizeof(char));
+    ubwt_count_t i, j, uni_i = 0, uni_len = 1000; uint8_t nt;
     ubwt_count_t k, occ_k;
     
     k = ubwt->C[nt_N] + uid;
@@ -244,21 +243,21 @@ void ubwt_thread_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, int uni_s, char **
         if (ubwt_bwt_nt(ubwt, k) >= nt_N) break; 
     }
     out_unipath[uid-uni_s] = (char*)_err_malloc(uni_i+1);
-    int j = 0;
-    for (i = uni_i-1; i >= 0; --i)
+    j = 0;
+    for (i = uni_i-1; i != 0; --i)
         out_unipath[uid-uni_s][j++] = unipath[i];
     out_unipath[uid-uni_s][j] = '\0';
     free(unipath);
 }
 
-int THREAD_I;
+uint64_t THREAD_I;
 pthread_rwlock_t RWLOCK;
 
 static void *ubwt_thread_gen_unipath(void *aux)
 {
     ubwt_gen_uni_aux_t *a = (ubwt_gen_uni_aux_t*)aux;
 
-    int i;
+    ubwt_count_t i;
     while (1) {
         pthread_rwlock_wrlock(&RWLOCK);
         i = THREAD_I++;
@@ -275,9 +274,8 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
     ubwt_count_t max_len=0;
     if (t > 1) {
         int i;
-        int chunk_n = chunk_size;
+        ubwt_count_t j, chunk_n = chunk_size, uni_s = 0, remain_uni = uni_c;
         char **unipath = (char**)_err_malloc(chunk_n * sizeof(char*));
-        int uni_s = 0, remain_uni=uni_c;
         ubwt_gen_uni_aux_t *aux = (ubwt_gen_uni_aux_t*)_err_malloc(t * sizeof(ubwt_gen_uni_aux_t));
         for (i = 0; i < t; ++i) {
             aux[i].tid = i;
@@ -304,12 +302,12 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
             //for (i = 0; i < chunk_n; ++i)
             //    fprintf(out, ">%lld_%d\n%s\n", (long long)uni_s+i+1, (int)strlen(unipath[i]), unipath[i]);
             // output only unipath length
-            for (i = 0; i < chunk_n; ++i) {
-                ubwt_count_t len = strlen(unipath[i]);
+            for (j = 0; j < chunk_n; ++j) {
+                ubwt_count_t len = strlen(unipath[j]);
                 if (len > max_len) max_len = len;
                 fprintf(out, "%lld\n", (long long)len); 
             }
-            for(i = 0; i < chunk_n; ++i) free(unipath[i]);
+            for(j = 0; j < chunk_n; ++j) free(unipath[j]);
             uni_s += chunk_n;              
             remain_uni -= chunk_n;
         }
@@ -347,7 +345,7 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
 uint8_t *ubwt_read_seq(FILE *fp, uint64_t *seq_l)
 {
     uint8_t *bseq = (uint8_t*)_err_malloc(100 * sizeof(uint8_t));
-    char ch; int i = 0, m = 100;
+    char ch; ubwt_count_t i = 0, m = 100;
     while ((ch = fgetc(fp)) != EOF) {
         if (isspace(ch) || ch == '\n') continue;
         if (i == m) {
@@ -363,7 +361,7 @@ uint8_t *ubwt_read_seq(FILE *fp, uint64_t *seq_l)
 uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
 {
     uint64_t bwt_int;
-    uint8_t *ubwt_bstr; ubwt_count_t bwt_i, i; int j;
+    uint8_t *ubwt_bstr; ubwt_count_t bwt_i, i, j;
     if (input_b) { // binary file, 4-bit per bp, first 64-bit: length
         FILE *fp = xopen(fn, "rb");
         err_fread_noeof(ubwt_l, sizeof(ubwt_count_t), 1, fp);
@@ -371,7 +369,7 @@ uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
         bwt_i = 0;
         for (i = 0; i < *ubwt_l / 16; ++i) {
             err_fread_noeof(&bwt_int, sizeof(uint64_t), 1, fp);
-            for (j = 15; j >= 0; --j) {
+            for (j = 15; j != 0; --j) {
                 ubwt_bstr[bwt_i++] = (bwt_int >> (4*j)) & 0x7;
             }
         }
