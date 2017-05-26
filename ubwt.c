@@ -64,7 +64,7 @@ int ubwt_cal(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t ubwt_l)
 {
     ubwt_count_t i, uni_c = 0;
     for (i = 0; i < ubwt_l; ++i) {
-        if (ubwt_bstr[i] == 4) ++uni_c;
+        if (ubwt_bstr[i] >= nt_N) ++uni_c;
         ubwt_cal_occ(ubwt_bstr[i], ubwt);
     }
     return uni_c;
