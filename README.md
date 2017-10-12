@@ -18,7 +18,7 @@ $ ./ubwt index ./test_data/test.BWT_STR -fP
 $ ./ubwt query ./test_data/test.BWT_STR ./test_data/test.query1
 ```
 
-##  Command and options
+##  Commands and options
 ```
 Program: ubwt
 Usage:   ubwt <command> [options]
@@ -47,7 +47,7 @@ $ head -n2 ./test_data/test.unipath
 >1_12
 AGATCCGATGAG
 ```
-### Output format:
+### FASTA output format:
 ```
 >uniID_uniLen
 uniSeq
@@ -87,5 +87,5 @@ Usage: ubwt query <BWT-index.prefix> <in-query> > match.out
 $ ./ubwt query ./test_data/test.BWT_STR ./test_data/test.query1
 1_12	4
 ```
-* Output consists two columns: <unipath name> <offset(1-based)> 
+* Output consists two columns: <unipath_name> <offset(1-based)> 
 
