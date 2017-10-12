@@ -69,6 +69,7 @@ void ubwt_gen_bit_table16(ubwt_t *ubwt);
 void ubwt_update(ubwt_t *ubwt);
 void ubwt_gen_map(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c);
 ubwt_count_t ubwt_cal_off(ubwt_t *ubwt, ubwt_count_t k, ubwt_count_t *off);
+ubwt_count_t ubwt_uni_len(ubwt_t *ubwt, ubwt_count_t uid);
 void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE *out, int t, int chunk_size);
 void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out);
 

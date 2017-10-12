@@ -6,15 +6,21 @@
 #include "ubwt_query.h"
 #include "utils.h"
 
+#define VERSION "1.0.0"
+#define CONTACT "yangao07@hit.edu.cn"
+
 int usage(void)
 {
     err_printf("\n");
-	err_printf("Program: ubwt\n");
+	err_printf("Program: ubwt (uni-path BWT utilities)\n");
 	err_printf("Usage:   ubwt <command> [options]\n\n");
 	err_printf("Commands: \n");
-	err_printf("         unipath     generate unipath seq from bwt-str\n");
-    err_printf("         index       index unipath's bwt-str\n");
-	err_printf("         query       query the unipath with the bwt index\n");
+	err_printf("         unipath     generate uni-path sequence from BWT string\n");
+    err_printf("         index       build BWT index for uni-path sequence\n");
+	err_printf("         query       find exact match of query sequence on BWT index\n");
+	err_printf("\n");
+    err_printf("Version: %s\n", VERSION);
+    err_printf("Contact: %s\n", CONTACT);
 	err_printf("\n");
 	return 1;
 }

@@ -198,6 +198,20 @@ ubwt_count_t ubwt_cal_off(ubwt_t *ubwt, ubwt_count_t k, ubwt_count_t *off)
     return ubwt->ubwt_map[occ_k];
 }
 
+// return unipath length, excluding 'N' symbol
+ubwt_count_t ubwt_uni_len(ubwt_t *ubwt, ubwt_count_t uid) {
+    ubwt_count_t uni_len = 0, k, occ_k;
+    uint8_t nt;
+    k = ubwt->C[nt_N] + uid;
+    while (ubwt_bwt_nt(ubwt, k) < nt_N) {
+        ++uni_len;
+        nt  = ubwt_bwt_nt(ubwt, k);
+        occ_k = ubwt_occ(ubwt, k, nt);
+        k = ubwt->C[nt] + occ_k;
+    }
+    return uni_len;
+}
+
 void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
 {
     char *unipath = (char*)_err_calloc(1000, sizeof(char));
@@ -218,9 +232,8 @@ void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
     }
     // store in struct, output for every N unipaths XXX
     fprintf(out, ">%lld_%lld\n", (long long)uid+1, (long long)uni_i);
-    for (i = uni_i-1; i != 0; --i)
-        fprintf(out, "%c", unipath[i]);
-    fprintf(out, "\n");
+    for (i = uni_i-1; i != 0; --i) fprintf(out, "%c", unipath[i]);
+    fprintf(out, "%c\n", unipath[0]);
     free(unipath);
 }
 
@@ -273,8 +286,8 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
 {
     ubwt_count_t max_len=0;
     if (t > 1) {
-        int i;
-        ubwt_count_t j, chunk_n = chunk_size, uni_s = 0, remain_uni = uni_c;
+        int i, chunk_n = chunk_size;
+        ubwt_count_t uni_s = 0, remain_uni = uni_c;
         char **unipath = (char**)_err_malloc(chunk_n * sizeof(char*));
         ubwt_gen_uni_aux_t *aux = (ubwt_gen_uni_aux_t*)_err_malloc(t * sizeof(ubwt_gen_uni_aux_t));
         for (i = 0; i < t; ++i) {
@@ -283,7 +296,7 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
             aux[i].unipath = unipath;
         }
         while (remain_uni > 0) {
-            if (remain_uni < chunk_n) chunk_n = remain_uni;
+            if (remain_uni < (unsigned long)chunk_n) chunk_n = (int)remain_uni;
 
             for (i = 0; i < t; ++i) {
                 aux[i].uni_s = uni_s; aux[i].uni_c = uni_s + chunk_n;
@@ -299,22 +312,21 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
             free(tid);
 
             // output chunk_n unipaths
-            //for (i = 0; i < chunk_n; ++i)
-            //    fprintf(out, ">%lld_%d\n%s\n", (long long)uni_s+i+1, (int)strlen(unipath[i]), unipath[i]);
-            // output only unipath length
-            for (j = 0; j < chunk_n; ++j) {
-                ubwt_count_t len = strlen(unipath[j]);
+            for (i = 0; i < (int)chunk_n; ++i) {
+                ubwt_count_t len = strlen(unipath[i]);
                 if (len > max_len) max_len = len;
-                fprintf(out, "%lld\n", (long long)len); 
+                fprintf(out, ">%lld_%lld\n%s\n", (long long)uni_s+i+1, (long long)strlen(unipath[i]), unipath[i]);
+                // output only unipath length
+                //fprintf(out, "%lld\n", (long long)len); 
             }
-            for(j = 0; j < chunk_n; ++j) free(unipath[j]);
+            for(i = 0; i < chunk_n; ++i) free(unipath[i]);
             uni_s += chunk_n;              
             remain_uni -= chunk_n;
         }
         free(aux); free(unipath);
     } else {
         char *unipath = (char*)_err_calloc(1000, sizeof(char));
-        ubwt_count_t uni_i, i, k, occ_k, uni_len = 1000;
+        ubwt_count_t uni_i, i, j, k, occ_k, uni_len = 1000;
 
         for (i = 0; i < uni_c; ++i) {
             uni_i = 0;
@@ -329,17 +341,18 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
                 k = ubwt->C[ubwt_bstr[k]] + occ_k;
                 if (ubwt_bstr[k] >= nt_N) break; 
             }
-            //fprintf(out, ">%lld_%d\n", (long long)i+1, uni_i);
-            //for (j = uni_i-1; j >= 0; --j)
-            //    fprintf(out, "%c", unipath[j]);
-            //fprintf(out, "\n");
+            fprintf(out, ">%lld_%lld\n", (long long)i+1, (long long)uni_i);
+            for (j = uni_i-1; j != 0; --j)
+                fprintf(out, "%c", unipath[j]);
+            fprintf(out, "%c\n", unipath[0]);
             // output only unipath length
-            fprintf(out, "%lld\n", (long long)uni_i);
+            // fprintf(out, "%lld\n", (long long)uni_i);
             if (uni_i > max_len) max_len = uni_i;
         }
         free(unipath);
     }
-    fprintf(out, "MAX: %lld\n", (long long)max_len);
+    // output maximum length of unipath
+    fprintf(stdout, "MAX: %lld\n", (long long)max_len);
 }
 
 uint8_t *ubwt_read_seq(FILE *fp, uint64_t *seq_l)
