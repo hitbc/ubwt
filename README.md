@@ -13,10 +13,10 @@ cd ubwt; make
 
 ## Get started with test data in `test_data`
 ```
-$ ./ubwt unipath ./test_data/test.BWT_STR -fP -o ./test_data/test.unipath
-$ ./ubwt unipath ./test_data/test.BWT_STR -fP -g -e ./test_data/test.edge -o ./test_data.gfa
-$ ./ubwt index ./test_data/test.BWT_STR -fP
-$ ./ubwt query ./test_data/test.BWT_STR ./test_data/test.query1
+$ ./ubwt unipath ./test_data/chr20.ubwt -o ./test_data/chr20.unipath.fa
+$ ./ubwt unipath ./test_data/chr20.ubwt -e ./test_data/chr20.edges -k 55 -a G -o ./chr20.unipath.gfa
+$ ./ubwt index ./test_data/chr20.ubwt
+$ ./ubwt query ./test_data/chr20.ubwt ./test_data/in.query
 ```
 
 ##  Commands and options
@@ -25,9 +25,9 @@ Program: ubwt
 Usage:   ubwt <command> [options]
 
 Commands: 
-         unipath     generate unipath seq from bwt-str
-         index       index unipath's bwt-str
-         query       query the unipath with the bwt index
+         unipath     generate uni-path sequence from BWT string
+         index       build BWT index for uni-path sequence
+         query       find exact match of query sequence with BWT index
 ```
 ## Generate uni-path sequence from BWT string
 ```
