@@ -42,8 +42,9 @@ Options:
     -e    [STR] Edge sequence file in binary format. Required when output GFA format. [NULL]
     -k    [INT] Length of k-mer. Required when output GFA format.
     -o    [STR] Output file. [stdout]
-    -b          Output unipath in binary format. Default is FASTA format. [False].
-    -g          Output unipath in GTA format. [False]
+    -a          Format of output file. [F]
+                  "F": FASTA format.
+                  "G": GFA format.
 ```
 ### Example:
 ```
@@ -56,7 +57,7 @@ GGCCAACATGGTGAAACCCCATCTCTACTAAAAATACAAAAATTAGCTGGGCGTCATGGCGGGCGCCTGTAGTCCCAGCT
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATATATATATATATATATATA
 
 # GFA output
-$ ./ubwt unipath ./test_data/chr20.ubwt -g -e ./test_data/chr20.edges -k 55 -o ./test_data/chr20.unipath.gfa
+$ ./ubwt unipath ./test_data/chr20.ubwt -e ./test_data/chr20.edges -k 55 -o ./test_data/chr20.unipath.gfa -a G
 $ head -n4 ./test_data/chr20.unipath.gfa
 S	1	GGCCAACATGGTGAAACCCCATCTCTACTAAAAATACAAAAATTAGCTGGGCGTCATGGCGGGCGCCTGTAGTCCCAGCTACCTGGGAGGTTGAGGTGGGAGAATCGCTTGAACCCGGGAGGCGGAGGCTGCAGCAGCTGAGATTGTGCCACTGCACTCCAGCCTTGGCCACAGAGCAAGACCTTGTCTCCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATATATATATAT	LN:i:246
 L	1	+	6	+	54M
