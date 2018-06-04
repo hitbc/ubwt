@@ -48,7 +48,7 @@ int ubwt_query(int argc, char *argv[])
     ubwt_t *ubwt = ubwt_restore_index(prefix);
 
     ubwt_count_t qlen;
-    uint8_t *bquery = ubwt_read_bwt_str(in, 0, &qlen);
+    uint8_t *bquery = ubwt_read_seq(in, &qlen);
     ubwt_query_core(ubwt, bquery, qlen);
 
     free(prefix); free(in);

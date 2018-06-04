@@ -174,6 +174,19 @@ long err_ftell(FILE *stream)
 	return ret;
 }
 
+int err_func_printf(const char *func, const char *format, ...)
+{
+    fprintf(stderr, "[%s] ", func);
+	va_list arg;
+	int done;
+	va_start(arg, format);
+	done = vfprintf(stderr, format, arg);
+	int saveErrno = errno;
+	va_end(arg);
+	if (done < 0) _err_fatal_simple("vfprintf(stderr)", strerror(saveErrno));
+	return done;
+}
+
 int err_printf(const char *format, ...) 
 {
 	va_list arg;
@@ -230,6 +243,13 @@ int err_fputs(const char *s, FILE *stream)
 	}
 
 	return ret;
+}
+
+void err_fgets(char *buff, size_t s, FILE *fp)
+{
+    if (fgets(buff, s, fp) == NULL) {
+        err_fatal_simple("fgets error.\n");
+    }
 }
 
 int err_puts(const char *s)
@@ -338,4 +358,30 @@ void get_cur_time(const char *prefix)
     ts = *localtime(&now);
     err_printf("[%s] ", prefix);
     strftime(buf, sizeof(buf), "%Y-%m-%d-%s", &ts);
+}
+
+void print_format_time(FILE *out)
+{
+    time_t rawtime;
+    struct tm *info;
+    char buffer[80];
+
+    time(&rawtime);
+    info = localtime( &rawtime );
+    strftime(buffer,80,"%m-%d-%Y %X", info);
+    fprintf(out, "=== %s === ", buffer);
+}
+
+int err_func_format_printf(const char *func, const char *format, ...)
+{
+    print_format_time(stderr);
+    fprintf(stderr, "[%s] ", func);
+	va_list arg;
+	int done;
+	va_start(arg, format);
+	done = vfprintf(stderr, format, arg);
+	int saveErrno = errno;
+	va_end(arg);
+	if (done < 0) _err_fatal_simple("vfprintf(stderr)", strerror(saveErrno));
+	return done;
 }

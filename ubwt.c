@@ -31,6 +31,7 @@ void ubwt_init(ubwt_t *ubwt, ubwt_count_t ubwt_l)
     ubwt_count_t n_occ = (ubwt_l + _OCC_INV - 1) / _OCC_INV; // do NOT store last one C[5]
     ubwt->ubwt_size = (ubwt_l + _BWT_INV - 1) / _BWT_INV + n_occ * _OCC_C;
     ubwt->ubwt = (ubwt_int_t*)_err_calloc(ubwt->ubwt_size, sizeof(ubwt_int_t));
+    ubwt->ubwt_map = NULL;
     ubwt->ubwt_unit = 0, ubwt->ubwt_i = 0, ubwt->ubwt_k = 0;
     int i; for (i = 0; i < _OCC_C; ++i) ubwt->C[i] = 0;
 }
@@ -164,22 +165,18 @@ ubwt_count_t ubwt_exact_match(const ubwt_t *ubwt, int qlen, const uint8_t *query
     *bwt_k = k, *bwt_l = l;
     return l-k+1;
 }
-
-void ubwt_gen_map(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c)
+ubwt_count_t ubwt_uid(ubwt_t *ubwt, ubwt_count_t k)
 {
-    ubwt->ubwt_map = (ubwt_count_t*)_err_malloc(uni_c * sizeof(ubwt_count_t));
-    ubwt_count_t i, k, occ_k;
-    for (i = 0; i < uni_c; ++i) {
-        k = ubwt->C[nt_N]+i;
-        while (1) {
-            occ_k = ubwt_occ(ubwt, k, ubwt_bstr[k]);
-            k = ubwt->C[ubwt_bstr[k]] + occ_k;
-            if (ubwt_bstr[k] >= nt_N) break;
-        }
-        occ_k = ubwt_occ(ubwt, k, nt_N);
-        ubwt->ubwt_map[occ_k] = i; // occ_k+1 => i+1
-        //printf("%d %d\n", occ_k+1, i+1);
+    ubwt_count_t occ_k;
+    uint8_t nt;
+
+    while (1) {
+        nt = ubwt_bwt_nt(ubwt, k);
+        occ_k = ubwt_occ(ubwt, k, nt);
+        if (nt >= nt_N) break;
+        k = ubwt->C[nt] + occ_k;
     }
+    return ubwt->ubwt_map[occ_k];
 }
 
 ubwt_count_t ubwt_cal_off(ubwt_t *ubwt, ubwt_count_t k, ubwt_count_t *off)
@@ -212,11 +209,11 @@ ubwt_count_t ubwt_uni_len(ubwt_t *ubwt, ubwt_count_t uid) {
     return uni_len;
 }
 
-void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
+void ubwt_out_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
 {
     char *unipath = (char*)_err_calloc(1000, sizeof(char));
     uint8_t nt;
-    ubwt_count_t i, k, occ_k, uni_i = 0, uni_len = 1000;
+    int64_t i; ubwt_count_t k, occ_k, uni_i = 0, uni_len = 1000;
     
     k = ubwt->C[nt_N] + uid;
     while (1) {
@@ -224,51 +221,116 @@ void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, FILE *out)
             uni_len <<= 1;
             unipath = (char*)_err_realloc(unipath, uni_len * sizeof(char));
         }
-        nt = ubwt_bwt_nt(ubwt, k);
+        if((nt = ubwt_bwt_nt(ubwt, k)) >= nt_N) break;
         unipath[uni_i++] = "ACGTN"[nt];
         occ_k = ubwt_occ(ubwt, k, nt);
         k = ubwt->C[nt] + occ_k;
-        if (ubwt_bwt_nt(ubwt, k) >= nt_N) break; 
     }
     // store in struct, output for every N unipaths XXX
     fprintf(out, ">%lld_%lld\n", (long long)uid+1, (long long)uni_i);
-    for (i = uni_i-1; i != 0; --i) fprintf(out, "%c", unipath[i]);
+    for (i = uni_i-1; i >= 0; --i) fprintf(out, "%c", unipath[i]);
     fprintf(out, "%c\n", unipath[0]);
     free(unipath);
 }
 
-void ubwt_thread_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, ubwt_count_t uni_s, char **out_unipath)
+void ubwt_gen_map1(ubwt_t *ubwt, ubwt_count_t uid) {
+    ubwt_count_t k, occ_k; uint8_t nt;
+    k = ubwt->C[nt_N]+uid;
+    while (1) {
+        ;
+        if ((nt = ubwt_bwt_nt(ubwt, k)) >= nt_N) break;
+        occ_k = ubwt_occ(ubwt, k, nt);
+        k = ubwt->C[nt] + occ_k;
+    }
+    occ_k = ubwt_occ(ubwt, k, nt_N);
+    ubwt->ubwt_map[occ_k] = uid; // occ_k+1 => i+1
+}
+void ubwt_gen_unipath1(ubwt_t *ubwt, ubwt_count_t uid, ubwt_count_t uni_s, char **out_unipath)
 {
     char *unipath = (char*)_err_calloc(1000, sizeof(char));
-    ubwt_count_t i, j, uni_i = 0, uni_len = 1000; uint8_t nt;
+    int64_t i; ubwt_count_t j, uni_i = 0, uni_len = 1000; uint8_t nt;
     ubwt_count_t k, occ_k;
-    
+
     k = ubwt->C[nt_N] + uid;
     while (1) {
         if (uni_i == uni_len) {
             uni_len <<= 1;
             unipath = (char*)_err_realloc(unipath, uni_len * sizeof(char));
         }
-        nt = ubwt_bwt_nt(ubwt, k);
+        if ((nt = ubwt_bwt_nt(ubwt, k)) >= nt_N) break; 
         unipath[uni_i++] = "ACGTN"[nt];
         occ_k = ubwt_occ(ubwt, k, nt);
         k = ubwt->C[nt] + occ_k;
-        if (ubwt_bwt_nt(ubwt, k) >= nt_N) break; 
     }
     out_unipath[uid-uni_s] = (char*)_err_malloc(uni_i+1);
     j = 0;
-    for (i = uni_i-1; i != 0; --i)
+    for (i = uni_i-1; i >= 0; --i)
         out_unipath[uid-uni_s][j++] = unipath[i];
     out_unipath[uid-uni_s][j] = '\0';
     free(unipath);
 }
 
+// TODO edge is 4-bits
+int ubwt_get_out_edge(uint8_t edge, uint8_t edge_seq[4]) {
+    int i, edge_n = 0; uint8_t seq[4] = {0x1, 0x2, 0x4, 0x8};
+    for (i = 0; i < 4; ++i) {
+        if (edge & seq[i]) edge_seq[edge_n++] = i;
+    }
+    return edge_n;
+}
+
+void ubwt_gen_gfa1(ubwt_t *ubwt, uint8_t *edge, ubwt_count_t uid, ubwt_count_t uni_s, ubwt_count_t klen, char **out_unipath, int *out_n, ubwt_count_t **out_uid)
+{
+    char *unipath = (char*)_err_calloc(1000, sizeof(char));
+    int64_t i; ubwt_count_t j, uni_i = 0, uni_len = 1000; 
+    ubwt_count_t k, occ_k;
+    uint8_t nt, *query_seq = (uint8_t*)_err_calloc(klen, sizeof(uint8_t));
+    ubwt_count_t out_n1=1000, out_uid1[4], query_k, query_l; uint8_t out_edge_seq[4];
+
+    k = ubwt->C[nt_N] + uid;
+    while (1) {
+        if (uni_i == uni_len) {
+            uni_len <<= 1;
+            unipath = (char*)_err_realloc(unipath, uni_len * sizeof(char));
+        }
+
+        nt = ubwt_bwt_nt(ubwt, k);
+        if (uni_i <= klen-2) { // last k-mer of current unipath
+            query_seq[klen-2 - uni_i] = nt;
+        } else if (uni_i == klen) { // construct k-mer on out-edge
+            out_n1 = ubwt_get_out_edge(edge[k], out_edge_seq);
+            for (j = 0; j < out_n1; ++j) {
+                query_seq[klen-1] = out_edge_seq[j];
+                if (ubwt_exact_match(ubwt, klen, query_seq, &query_k, &query_l) != 1)
+                    err_fatal(__func__, "Error: no exact match of k-mer. (k=%d)", (int)klen);
+                out_uid1[j] = ubwt_uid(ubwt, query_k);
+            }
+        }
+        if (nt >= nt_N) break; 
+
+        unipath[uni_i++] = "ACGTN"[nt];
+        occ_k = ubwt_occ(ubwt, k, nt);
+        k = ubwt->C[nt] + occ_k;
+    }
+    // dump unipath sequence
+    out_unipath[uid-uni_s] = (char*)_err_malloc(uni_i+1);
+    j = 0;
+    for (i = uni_i-1; i >= 0; --i)
+        out_unipath[uid-uni_s][j++] = unipath[i];
+    out_unipath[uid-uni_s][j] = '\0';
+    // dump link
+    out_n[uid-uni_s] = out_n1;
+    for (j = 0; j < out_n1; ++j) out_uid[uid-uni_s][j] = out_uid1[j];
+
+    free(unipath); free(query_seq);
+}
+
 uint64_t THREAD_I;
 pthread_rwlock_t RWLOCK;
 
-static void *ubwt_thread_gen_unipath(void *aux)
+static void *ubwt_thread_gen_map(void *aux)
 {
-    ubwt_gen_uni_aux_t *a = (ubwt_gen_uni_aux_t*)aux;
+    ubwt_thread_aux_t *a = (ubwt_thread_aux_t*)aux;
 
     ubwt_count_t i;
     while (1) {
@@ -277,19 +339,101 @@ static void *ubwt_thread_gen_unipath(void *aux)
         pthread_rwlock_unlock(&RWLOCK);
         if (i >= a->uni_c) break;
 
-        ubwt_thread_gen_unipath1(a->ubwt, i, a->uni_s, a->unipath); // XXX
+        ubwt_gen_map1(a->ubwt, i); // XXX
     }
     return 0;
 }
 
-void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE *out, int t, int chunk_size)
+static void *ubwt_thread_gen_unipath(void *aux)
 {
+    ubwt_thread_aux_t *a = (ubwt_thread_aux_t*)aux;
+
+    ubwt_count_t i;
+    while (1) {
+        pthread_rwlock_wrlock(&RWLOCK);
+        i = THREAD_I++;
+        pthread_rwlock_unlock(&RWLOCK);
+        if (i >= a->uni_c) break;
+
+        ubwt_gen_unipath1(a->ubwt, i, a->uni_s, a->unipath); // XXX
+    }
+    return 0;
+}
+
+static void *ubwt_thread_gen_gfa(void *aux)
+{
+    ubwt_thread_aux_t *a = (ubwt_thread_aux_t*)aux;
+
+    ubwt_count_t i;
+    while (1) {
+        pthread_rwlock_wrlock(&RWLOCK);
+        i = THREAD_I++;
+        pthread_rwlock_unlock(&RWLOCK);
+        if (i >= a->uni_c) break;
+
+        ubwt_gen_gfa1(a->ubwt, a->edge, i, a->uni_s, a->klen, a->unipath, a->out_n, a->out_uid); // XXX
+    }
+    return 0;
+}
+
+void ubwt_gen_map(ubwt_t *ubwt, ubwt_count_t uni_c, int t, int chunk_size)
+{
+    ubwt->ubwt_map = (ubwt_count_t*)_err_malloc(uni_c * sizeof(ubwt_count_t));
+    ubwt_count_t i, k, occ_k; uint8_t nt;
+    if (t > 1) {
+        int i, chunk_n = chunk_size;
+        ubwt_count_t uni_s = 0, remain_uni = uni_c;
+        ubwt_thread_aux_t *aux = (ubwt_thread_aux_t*)_err_malloc(t * sizeof(ubwt_thread_aux_t));
+        for (i = 0; i < t; ++i) {
+            aux[i].tid = i;
+            aux[i].ubwt = ubwt;
+        }
+        while (remain_uni > 0) {
+            if (remain_uni < (unsigned long)chunk_n) chunk_n = (int)remain_uni;
+
+            for (i = 0; i < t; ++i) {
+                aux[i].uni_s = uni_s; aux[i].uni_c = uni_s + chunk_n;
+            }
+
+            THREAD_I = uni_s;
+            pthread_t *tid = (pthread_t*)_err_malloc(t * sizeof(pthread_t)); pthread_attr_t attr;
+            pthread_attr_init(&attr); pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+            for (i = 0; i < t; ++i) {
+                pthread_create(&tid[i], &attr, ubwt_thread_gen_map, aux+i);
+            }
+            for (i = 0; i < t; ++i) pthread_join(tid[i], 0);
+            free(tid);
+
+            uni_s += chunk_n;              
+            remain_uni -= chunk_n;
+        }
+        free(aux);
+    } else {
+        for (i = 0; i < uni_c; ++i) {
+            k = ubwt->C[nt_N]+i;
+            while (1) {
+                if ((nt = ubwt_bwt_nt(ubwt, k)) >= nt_N) break;
+                occ_k = ubwt_occ(ubwt, k, nt);
+                k = ubwt->C[nt] + occ_k;
+            }
+            occ_k = ubwt_occ(ubwt, k, nt_N);
+            ubwt->ubwt_map[occ_k] = i; // occ_k+1 => i+1
+            //printf("%d %d\n", occ_k+1, i+1);
+        }
+    }
+}
+
+// fasta and binary format output
+void ubwt_gen_unipath(ubwt_t *ubwt, ubwt_count_t uni_c, FILE *out, int b_out, int t, int chunk_size)
+{
+    char f[2][10] = {"fasta", "binary"};
+    err_func_format_printf(__func__, "Generating unipath in %s format ...\n", f[b_out]);
     ubwt_count_t max_len=0;
     if (t > 1) {
         int i, chunk_n = chunk_size;
         ubwt_count_t uni_s = 0, remain_uni = uni_c;
         char **unipath = (char**)_err_malloc(chunk_n * sizeof(char*));
-        ubwt_gen_uni_aux_t *aux = (ubwt_gen_uni_aux_t*)_err_malloc(t * sizeof(ubwt_gen_uni_aux_t));
+        ubwt_thread_aux_t *aux = (ubwt_thread_aux_t*)_err_malloc(t * sizeof(ubwt_thread_aux_t));
         for (i = 0; i < t; ++i) {
             aux[i].tid = i;
             aux[i].ubwt = ubwt;
@@ -315,9 +459,8 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
             for (i = 0; i < (int)chunk_n; ++i) {
                 ubwt_count_t len = strlen(unipath[i]);
                 if (len > max_len) max_len = len;
-                fprintf(out, ">%lld_%lld\n%s\n", (long long)uni_s+i+1, (long long)strlen(unipath[i]), unipath[i]);
-                // output only unipath length
-                //fprintf(out, "%lld\n", (long long)len); 
+                if (b_out) {
+                } else fprintf(out, ">%lld_%lld\n%s\n", (long long)uni_s+i+1, (long long)strlen(unipath[i]), unipath[i]);
             }
             for(i = 0; i < chunk_n; ++i) free(unipath[i]);
             uni_s += chunk_n;              
@@ -326,39 +469,144 @@ void ubwt_gen_unipath(ubwt_t *ubwt, uint8_t *ubwt_bstr, ubwt_count_t uni_c, FILE
         free(aux); free(unipath);
     } else {
         char *unipath = (char*)_err_calloc(1000, sizeof(char));
-        ubwt_count_t uni_i, i, j, k, occ_k, uni_len = 1000;
+        ubwt_count_t uni_i, i, j, k, occ_k, uni_len = 1000; uint8_t nt;
 
         for (i = 0; i < uni_c; ++i) {
             uni_i = 0;
-            k = ubwt->C[nt_N]+i;
+            k = ubwt->C[nt_N]+i; // i-th unipath
             while (1) {
                 if (uni_i == uni_len) {
                     uni_len <<= 1;
                     unipath = (char*)_err_realloc(unipath, uni_len * sizeof(char));
                 }
-                unipath[uni_i++] = "ACGTN"[ubwt_bstr[k]];
-                occ_k = ubwt_occ(ubwt, k, ubwt_bstr[k]);
-                k = ubwt->C[ubwt_bstr[k]] + occ_k;
-                if (ubwt_bstr[k] >= nt_N) break; 
+                if ((nt = ubwt_bwt_nt(ubwt,k)) >= nt_N) break; 
+                unipath[uni_i++] = "ACGTN"[nt];
+                occ_k = ubwt_occ(ubwt, k, nt);
+                k = ubwt->C[nt] + occ_k;
+                //unipath[uni_i++] = "ACGTN"[ubwt_bstr[k]];
+                //occ_k = ubwt_occ(ubwt, k, ubwt_bstr[k]);
+                //k = ubwt->C[ubwt_bstr[k]] + occ_k;
+                //if (ubwt_bstr[k] >= nt_N) break; 
             }
+            if (b_out) {
+            } else {
             fprintf(out, ">%lld_%lld\n", (long long)i+1, (long long)uni_i);
             for (j = uni_i-1; j != 0; --j)
                 fprintf(out, "%c", unipath[j]);
             fprintf(out, "%c\n", unipath[0]);
-            // output only unipath length
-            // fprintf(out, "%lld\n", (long long)uni_i);
+            }
             if (uni_i > max_len) max_len = uni_i;
         }
         free(unipath);
     }
-    // output maximum length of unipath
-    fprintf(stdout, "MAX: %lld\n", (long long)max_len);
+    err_func_format_printf(__func__, "Generating unipath in %s format done.\n", f[b_out]);
+    // maximum unipath length
+    fprintf(stderr, "MAX: %lld\n", (long long)max_len);
 }
 
-uint8_t *ubwt_read_seq(FILE *fp, uint64_t *seq_l)
+// GFA format output
+void ubwt_gen_gfa(ubwt_t *ubwt, uint8_t *edge, ubwt_count_t uni_c, ubwt_count_t klen, FILE *out, int t, int chunk_size) {
+    err_func_format_printf(__func__, "Generating unipath in GFA format ...\n");
+    ubwt_count_t max_len=0;
+    if (t > 1) {
+        int i, j, chunk_n = chunk_size;
+        ubwt_count_t uni_s = 0, remain_uni = uni_c;
+        char **unipath = (char**)_err_malloc(chunk_n * sizeof(char*));
+        int *out_n = (int*)_err_malloc(chunk_n * sizeof(int));
+        ubwt_count_t **out_uid = (ubwt_count_t**)_err_malloc(chunk_n * sizeof(ubwt_count_t*));
+        for (i = 0; i < chunk_n; ++i) out_uid[i] = (ubwt_count_t*)_err_malloc(4 * sizeof(ubwt_count_t));
+        ubwt_thread_aux_t *aux = (ubwt_thread_aux_t*)_err_malloc(t * sizeof(ubwt_thread_aux_t));
+
+        for (i = 0; i < t; ++i) {
+            aux[i].tid = i;
+            aux[i].klen = klen;
+            aux[i].ubwt = ubwt; aux[i].edge = edge;
+            aux[i].unipath = unipath;
+            aux[i].out_n = out_n; aux[i].out_uid = out_uid;
+        }
+        while (remain_uni > 0) {
+            if (remain_uni < (unsigned long)chunk_n) chunk_n = (int)remain_uni;
+
+            for (i = 0; i < t; ++i) {
+                aux[i].uni_s = uni_s; aux[i].uni_c = uni_s + chunk_n;
+            }
+            
+            THREAD_I = uni_s;
+            pthread_t *tid = (pthread_t*)_err_malloc(t * sizeof(pthread_t)); pthread_attr_t attr;
+            pthread_attr_init(&attr); pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+            for (i = 0; i < t; ++i) {
+                pthread_create(&tid[i], &attr, ubwt_thread_gen_gfa, aux+i);
+            }
+            for (i = 0; i < t; ++i) pthread_join(tid[i], 0);
+            free(tid);
+
+            // output chunk_n unipaths and links
+            for (i = 0; i < (int)chunk_n; ++i) {
+                ubwt_count_t len = strlen(unipath[i]);
+                if (len > max_len) max_len = len;
+                fprintf(out, "S\t%lld\t%s\tLN:i:%lld\n", (long long)uni_s+i+1, unipath[i], (long long)len);
+                for (j = 0; j < out_n[i]; ++j) {
+                    fprintf(out, "L\t%lld\t+\t%lld\t+\t%lldM\n", (long long)uni_s+i+1, (long long)out_uid[i][j]+1, (long long)klen-1);
+                }
+            }
+            for(i = 0; i < chunk_n; ++i) free(unipath[i]);
+            uni_s += chunk_n;              
+            remain_uni -= chunk_n;
+        }
+        free(aux); free(unipath); free(out_n); 
+        for (i = 0; i < chunk_size; ++i) free(out_uid[i]); free(out_uid);
+    } else {
+        char *unipath = (char*)_err_calloc(1000, sizeof(char));
+        ubwt_count_t uni_i, i, j, k, occ_k, uni_len = 1000;
+
+        uint8_t nt, *query_seq = (uint8_t*)_err_calloc(klen, sizeof(uint8_t)); ubwt_count_t query_k, query_l, out_edge_n, out_uid[4]; uint8_t out_edge_seq[4];
+        for (i = 0; i < uni_c; ++i) {
+            uni_i = 0;
+            k = ubwt->C[nt_N]+i; // i-th unipath
+            out_edge_n = 0;
+            while (1) {
+                if (uni_i == uni_len) {
+                    uni_len <<= 1;
+                    unipath = (char*)_err_realloc(unipath, uni_len * sizeof(char));
+                }
+                nt = ubwt_bwt_nt(ubwt, k);
+                if (uni_i <= klen-2) { // last k-mer of current unipath
+                    query_seq[klen-2 - uni_i] = nt;
+                } else if (uni_i == klen) { // construct k-mer on out-edge
+                    out_edge_n = ubwt_get_out_edge(edge[k], out_edge_seq);
+                    for (j = 0; j < out_edge_n; ++j) {
+                        query_seq[klen-1] = out_edge_seq[j];
+                        if (ubwt_exact_match(ubwt, klen, query_seq, &query_k, &query_l) != 1)
+                            err_fatal(__func__, "Error: no exact match of k-mer. (k=%d)", (int)klen);
+                        out_uid[j] = ubwt_uid(ubwt, query_k);
+                    }
+                }
+                if (nt >= nt_N) break; 
+                unipath[uni_i++] = "ACGTN"[nt];
+                occ_k = ubwt_occ(ubwt, k, nt);
+                k = ubwt->C[nt] + occ_k;
+            }
+            fprintf(out, "S\t%lld\t", (long long)i+1); // Segment
+            for (j = uni_i-1; j != 0; --j)
+                fprintf(out, "%c", unipath[j]);
+            fprintf(out, "%c\tLN:i:%lld\n", unipath[0], (long long)uni_i);
+            for (j = 0; j < out_edge_n; ++j) {
+                fprintf(out, "L\t%lld\t+\t%lld\t+\t%dM\n", (long long)i+1, (long long)out_uid[j]+1, (int)klen-1); // Link
+            }
+            if (uni_i > max_len) max_len = uni_i;
+        }
+        free(unipath); free(query_seq);
+    }
+    err_func_format_printf(__func__, "Generating unipath in GFA format done.\n");
+    // maximum unipath length
+    fprintf(stderr, "MAX: %lld\n", (long long)max_len);
+}
+
+uint8_t *ubwt_read_seq(char *fn, ubwt_count_t *seq_l)
 {
     uint8_t *bseq = (uint8_t*)_err_malloc(100 * sizeof(uint8_t));
     char ch; ubwt_count_t i = 0, m = 100;
+    FILE *fp = xopen(fn, "r");
     while ((ch = fgetc(fp)) != EOF) {
         if (isspace(ch) || ch == '\n') continue;
         if (i == m) {
@@ -368,13 +616,15 @@ uint8_t *ubwt_read_seq(FILE *fp, uint64_t *seq_l)
         bseq[i++] = nst_nt4_table[(int)ch];
     }
     *seq_l = i;
+    err_fclose(fp);
     return bseq;
 }
 
 uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
 {
+    err_func_format_printf(__func__, "Reading ubwt string from %s ...\n", fn);
     uint64_t bwt_int;
-    uint8_t *ubwt_bstr; ubwt_count_t bwt_i, i, j;
+    uint8_t *ubwt_bstr; ubwt_count_t bwt_i, i; int j;
     if (input_b) { // binary file, 4-bit per bp, first 64-bit: length
         FILE *fp = xopen(fn, "rb");
         err_fread_noeof(ubwt_l, sizeof(ubwt_count_t), 1, fp);
@@ -382,7 +632,7 @@ uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
         bwt_i = 0;
         for (i = 0; i < *ubwt_l / 16; ++i) {
             err_fread_noeof(&bwt_int, sizeof(uint64_t), 1, fp);
-            for (j = 15; j != 0; --j) {
+            for (j = 15; j >= 0; --j) {
                 ubwt_bstr[bwt_i++] = (bwt_int >> (4*j)) & 0x7;
             }
         }
@@ -397,10 +647,42 @@ uint8_t *ubwt_read_bwt_str(char *fn, int input_b, ubwt_count_t *ubwt_l)
         }
         err_fclose(fp);
     } else {       // plain text
-        FILE *fp = xopen(fn, "r");
         // read bwt-str
-        ubwt_bstr = ubwt_read_seq(fp, ubwt_l);
-        err_fclose(fp);
+        ubwt_bstr = ubwt_read_seq(fn, ubwt_l);
     }
+    err_func_format_printf(__func__, "Reading ubwt string done.\n");
     return ubwt_bstr;
+}
+
+uint8_t *ubwt_read_edge(char *fn, ubwt_count_t *edge_l)
+{
+    err_func_format_printf(__func__, "Reading ubwt edge sequence from %s ...\n", fn);
+    uint64_t edge_int;
+    uint8_t *edge; ubwt_count_t edge_i, i; int j;
+    // binary file, 8-bit per bp, first 64-bit: length
+    // TGCA   TGCA
+    // ---- | ----
+    //  in     out
+    FILE *fp = xopen(fn, "rb");
+    err_fread_noeof(edge_l, sizeof(ubwt_count_t), 1, fp);
+    edge = (uint8_t*)_err_malloc(*edge_l * sizeof(uint8_t));
+    edge_i = 0;
+    for (i = 0; i < *edge_l / 8; ++i) {
+        err_fread_noeof(&edge_int, sizeof(uint64_t), 1, fp);
+        for (j = 7; j >= 0; --j) {
+            edge[edge_i++] = (edge_int >> (8*j)) & 0xff;
+        }
+    }
+    // last one bwt_int
+    if (*edge_l != (*edge_l/8)*8) {
+        err_fread_noeof(&edge_int, sizeof(uint64_t), 1, fp);
+        j = *edge_l % 8;
+        for (i = 0; i < *edge_l % 8; ++i) {
+            edge[edge_i+j-i-1] = edge_int & 0xff;
+            edge_int >>= 8;
+        }
+    }
+    err_fclose(fp);
+    err_func_format_printf(__func__, "Reading ubwt edge sequence done.\n");
+    return edge;
 }
