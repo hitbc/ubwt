@@ -17,7 +17,7 @@ int usage(void)
 	err_printf("Commands: \n");
 	err_printf("         unipath     generate uni-path sequence from BWT string\n");
     err_printf("         index       build BWT index for uni-path sequence\n");
-	err_printf("         query       find exact match of query sequence on BWT index\n");
+	err_printf("         query       find exact match of query sequence with BWT index\n");
 	err_printf("\n");
     err_printf("Version: %s\n", VERSION);
     err_printf("Contact: %s\n", CONTACT);
