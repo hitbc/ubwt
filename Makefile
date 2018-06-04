@@ -1,6 +1,6 @@
 CC      =	gcc
 CFLAGS  =	-Wall -O3 -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function
-DFLAGS  =	-g -Wall  
+DFLAGS  =	-g -Wall
 LIB     =	-lm -lz -lpthread
 
 BIN_DIR =	.

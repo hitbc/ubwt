@@ -9,6 +9,7 @@ int ubwt_index_usage(void)
     err_printf("\n");
     err_printf("Usage:   ubwt index [option] <BWT-STR>\n\n");
     err_printf("Options:\n\n");
+    err_printf("    -t    [INT] Number of threads. [1].\n");
     err_printf("    -f    [STR] Format of input bwt-str. [B]\n"); 
     err_printf("                  \"B\": binary file, 4-bit per bp, 0/1/2/3/4:A/C/G/T/#(first 64-bit: length).\n");
     err_printf("                  \"P\": plain text.\n");
@@ -21,9 +22,11 @@ void ubwt_dump(ubwt_t *ubwt, const char *prefix)
 {
     char *fn = (char*)_err_calloc(strlen(prefix)+15, sizeof(char));
     // dump bwt
-    err_printf("[%s] Writing ubwt to file ...\n", __func__);
-    strcpy(fn, prefix); strcat(fn, ".ubwt");
+    strcpy(fn, prefix); strcat(fn, ".ubwti");
+    err_func_format_printf(__func__, "Writing ubwt index to %s ...\n", fn);
     FILE *fp = xopen(fn, "wb");
+    ubwt_count_t zero = 0;
+    err_fwrite(&zero, sizeof(ubwt_count_t), 1, fp);
     err_fwrite(&ubwt->ubwt_l, sizeof(ubwt_count_t), 1, fp);
     err_fwrite(&ubwt->ubwt_size, sizeof(ubwt_count_t), 1, fp);
     err_fwrite(ubwt->C, sizeof(ubwt_count_t), _OCC_C, fp);
@@ -34,7 +37,7 @@ void ubwt_dump(ubwt_t *ubwt, const char *prefix)
     err_fclose(fp);
     
     free(fn);
-    err_printf("[%s] Writing index done.\n", __func__);
+    err_func_format_printf(__func__, "Writing ubwt index done.\n");
 }
 
 static void fread_fix(FILE *fp, ubwt_count_t size, void *a)
@@ -54,10 +57,15 @@ ubwt_t *ubwt_restore_index(const char *prefix)
     char *fn = (char*)_err_calloc(strlen(prefix)+15, sizeof(char));
     ubwt_t *ubwt;
     // restore bwt
-    strcpy(fn, prefix); strcat(fn, ".ubwt");
+    strcpy(fn, prefix); strcat(fn, ".ubwti");
+    err_func_format_printf(__func__, "Restoring ubwt index from %s ...\n", fn);
     FILE *fp = xopen(fn, "rb");
-
     ubwt = (ubwt_t*)_err_calloc(1, sizeof(ubwt_t));
+
+    ubwt_count_t zero;
+    err_fread_noeof(&zero, sizeof(ubwt_count_t), 1, fp);
+    if (zero != 0) err_fatal_simple("Error: wrong ubwt index format.");
+
     err_fread_noeof(&ubwt->ubwt_l, sizeof(ubwt_count_t), 1, fp);
     err_fread_noeof(&ubwt->ubwt_size, sizeof(ubwt_count_t), 1, fp);
     err_fread_noeof(ubwt->C, sizeof(ubwt_count_t), _OCC_C, fp);
@@ -73,14 +81,16 @@ ubwt_t *ubwt_restore_index(const char *prefix)
     //debwt_gen_cnt_table8(db);
 
     free(fn);
+    err_func_format_printf(__func__, "Restoring ubwt index done.\n");
     return ubwt;
 }
 
 int ubwt_index(int argc, char *argv[])
 {
-    int c; int input_b = 1; char *prefix=NULL;
-    while ((c = getopt(argc, argv, "f:o:")) >= 0) {
+    int c, input_b=1, t=1; char *prefix=NULL;
+    while ((c = getopt(argc, argv, "t:f:o:")) >= 0) {
         switch (c) {
+            case 't': t = atoi(optarg); break;
             case 'f': if (optarg[0] == 'P') input_b = 0; break;
             case 'o': prefix = optarg; break;
             default: return ubwt_index_usage();
@@ -93,13 +103,15 @@ int ubwt_index(int argc, char *argv[])
     // read ubwt str
     uint8_t *ubwt_bstr = ubwt_read_bwt_str(fn, input_b, &ubwt_l);
 
+    err_func_format_printf(__func__, "Constructing ubwt ...\n");
     // init ubwt
     ubwt_t *ubwt = (ubwt_t*)_err_malloc(sizeof(ubwt_t));
     ubwt_init(ubwt, ubwt_l);
     // claculate occ, c bwt_map
     ubwt->uni_c = ubwt_cal(ubwt, ubwt_bstr, ubwt_l);
     ubwt_update(ubwt);
-    ubwt_gen_map(ubwt, ubwt_bstr, ubwt->uni_c);
+    ubwt_gen_map(ubwt, ubwt->uni_c, t, CHUNK_SIZE);
+    err_func_format_printf(__func__, "Constructing ubwt done.\n");
 
     // dump bwt index to disk
     ubwt_dump(ubwt, prefix); 
