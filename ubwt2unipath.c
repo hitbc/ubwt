@@ -15,10 +15,10 @@ int ubwt2unipath_usage(void)
     err_printf("                  \"P\": plain text.\n");
     err_printf("    -e    [STR] Edge sequence file in binary format. Required when output GFA format. [NULL]\n");
     err_printf("    -k    [INT] Length of k-mer. Required when output GFA format.\n");
-    err_printf("    -o    [STR] Output file. [stdout]\n");
-    err_printf("    -a          Format of output file. [F]\n");
+    err_printf("    -a    [STR] Format of output file. [F]\n");
     err_printf("                  \"F\": FASTA format.\n");
     err_printf("                  \"G\": GFA format.\n");
+    err_printf("    -o    [STR] Output file. [stdout]\n");
     //err_printf("    -b          Output binary file. [False].\n");
     //err_printf("    -c    [INT] Chunk size of each run when t>1. [%d]\n", CHUNK_SIZE);
     err_printf("\n");

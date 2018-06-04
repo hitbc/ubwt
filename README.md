@@ -41,10 +41,10 @@ Options:
                   "P": plain text.
     -e    [STR] Edge sequence file in binary format. Required when output GFA format. [NULL]
     -k    [INT] Length of k-mer. Required when output GFA format.
-    -o    [STR] Output file. [stdout]
-    -a          Format of output file. [F]
+    -a    [STR] Format of output file. [F]
                   "F": FASTA format.
                   "G": GFA format.
+    -o    [STR] Output file. [stdout]
 ```
 ### Example:
 ```
